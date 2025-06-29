@@ -1,0 +1,44 @@
+    # docker-compose.yml
+    version: "3"
+
+    services:
+      php-apache:
+        container_name: "uas-php-apache"
+        build:
+          context: .
+          dockerfile: Dockerfile
+        # Volume ini akan menautkan kode Laravel di host Anda ke dalam container
+        # Pastikan PATH_TO_LARAVEL_PROJECT sesuai dengan lokasi proyek Anda di host
+        volumes:
+          - ./app:/var/www/html # Menggunakan ./app karena laravel akan diinstal di dalamnya
+        ports:
+          - "80:80"
+        depends_on:
+          - db # Pastikan container 'db' dimulai sebelum 'php-apache'
+
+      db:
+        container_name: "uas-mysql"
+        image: mysql:8.2
+        restart: always
+        environment:
+          MYSQL_ROOT_PASSWORD: 2332 # Ganti dengan password root yang kuat!
+          MYSQL_DATABASE: uas_db
+          MYSQL_USER: uas_user
+          MYSQL_PASSWORD: 2332 # Ganti dengan password user yang kuat!
+          # MYSQL_ROOT_USER tidak diperlukan untuk konfigurasi standar
+        volumes:
+          - db_data:/var/lib/mysql # Menyimpan data database secara persisten
+        ports:
+          - "3306:3306" # Hanya jika Anda perlu mengakses MySQL dari host
+
+      adminer:
+        container_name: "uas-adminer"
+        image: adminer
+        ports:
+          - "8080:8080"
+        depends_on:
+          - db # Adminer membutuhkan 'db' untuk terhubung
+
+    volumes:
+      db_data: # Definisi volume untuk data database persisten
+    
