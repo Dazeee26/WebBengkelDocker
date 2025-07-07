@@ -1,5 +1,5 @@
 # Nama alur kerja ini akan muncul di tab "Actions" di repositori GitHub Anda
-name: CI/CD Laravel Bengkel dengan Docker
+name: Frontend CI Build untuk Vercel
 
 # Menentukan kapan alur kerja ini akan dijalankan
 on:
@@ -11,7 +11,7 @@ on:
       - main # Jalankan alur kerja saat ada pull request ke branch 'main'
 
 jobs:
-  build-and-test-with-docker:
+  build-frontend:
     # Menentukan runner lingkungan untuk job ini
     runs-on: ubuntu-latest
 
@@ -19,80 +19,20 @@ jobs:
     - name: Checkout Kode
       uses: actions/checkout@v4 # Mengambil kode dari repositori
 
-    - name: Membangun Image Docker
-      # Perintah ini akan membangun semua image yang didefinisikan dalam docker-compose.yml
-      # Pastikan Dockerfile Anda dikonfigurasi untuk PHP 8.2 dan Apache.
-      run: docker-compose build
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20' # Sesuaikan dengan versi Node.js yang Anda gunakan untuk frontend
 
-    - name: Menjalankan Layanan Docker Compose
-      # Menjalankan layanan di latar belakang
-      run: docker-compose up -d
+    - name: Instal Dependensi Frontend (NPM/Yarn)
+      # Asumsi package.json ada di root proyek atau di sub-direktori frontend
+      run: npm install # Atau 'yarn install' jika Anda menggunakan Yarn
 
-    - name: Menunggu Layanan Database Siap (Opsional, tapi direkomendasikan jika menggunakan DB eksternal)
-      # Jika Anda menggunakan database seperti MySQL/PostgreSQL di docker-compose.yml,
-      # Anda mungkin perlu menunggu hingga database siap sebelum menjalankan migrasi.
-      # Untuk SQLite in-memory, langkah ini tidak terlalu krusial.
-      run: sleep 10 # Beri waktu 10 detik agar kontainer startup
+    - name: Jalankan Build Frontend
+      # Perintah ini akan mengkompilasi aset frontend Anda (misalnya, dari resources/js)
+      # Pastikan ini menghasilkan file statis ke direktori yang benar (misalnya, 'public' atau 'dist')
+      run: npm run build # Atau 'yarn build'
 
-    - name: Salin .env.example ke .env di dalam kontainer
-      # Kita akan menyalin .env.example ke dalam kontainer 'app'
-      # Ini penting agar Laravel memiliki konfigurasi yang benar di dalam kontainer
-      run: docker-compose exec app cp .env.example .env
-
-    - name: Buat Kunci Aplikasi Laravel di dalam kontainer
-      run: docker-compose exec app php artisan key:generate
-
-    - name: Instal Dependensi Composer di dalam kontainer
-      # Menjalankan composer install di dalam kontainer 'app'
-      run: docker-compose exec app composer install --no-interaction --prefer-dist --optimize-autoloader
-
-    - name: Instal Dependensi NPM di dalam kontainer
-      # Menjalankan npm install di dalam kontainer 'app'
-      # Asumsi Node.js tersedia di dalam kontainer 'app' (melalui Dockerfile Anda)
-      run: docker-compose exec app npm install
-
-    - name: Jalankan Build Frontend (Vite) di dalam kontainer
-      # Menjalankan npm run build di dalam kontainer 'app'
-      run: docker-compose exec app npm run build
-
-    - name: Konfigurasi Database untuk Tes di dalam kontainer
-      # Untuk CI/CD, seringkali menggunakan SQLite in-memory atau file untuk tes.
-      # Pastikan konfigurasi .env di dalam kontainer disetel untuk ini.
-      # Kita akan setel variabel lingkungan langsung untuk perintah migrasi dan tes.
-      run: |
-        docker-compose exec app php artisan config:clear
-        docker-compose exec app php artisan cache:clear
-        docker-compose exec app php artisan view:clear
-
-    - name: Jalankan Migrasi Database di dalam kontainer
-      # Menjalankan migrasi di dalam kontainer 'app'
-      # Kita gunakan DB_CONNECTION=sqlite dan DB_DATABASE=:memory: untuk tes cepat
-      run: docker-compose exec -e DB_CONNECTION=sqlite -e DB_DATABASE=:memory: app php artisan migrate --force
-
-    - name: Jalankan Seeder (opsional) di dalam kontainer
-      # Jika Anda memiliki data seeder yang diperlukan untuk tes, Anda bisa menjalankannya di sini.
-      run: docker-compose exec -e DB_CONNECTION=sqlite -e DB_DATABASE=:memory: app php artisan db:seed --force
-
-    - name: Jalankan Tes PHPUnit di dalam kontainer
-      # Menjalankan tes PHPUnit di dalam kontainer 'app'
-      run: docker-compose exec -e DB_CONNECTION=sqlite -e DB_DATABASE=:memory: app php artisan test
-
-    - name: Menghentikan Layanan Docker Compose
-      # Pastikan untuk menghentikan dan membersihkan kontainer setelah tes selesai
-      if: always() # Selalu jalankan langkah ini, bahkan jika ada kegagalan sebelumnya
-      run: docker-compose down --volumes --remove-orphans
-
-    # --- Bagian Opsional: Deployment (Contoh sederhana) ---
-    # Jika Anda ingin melakukan deployment otomatis, Anda bisa menambahkan langkah-langkah di sini.
-    # Ini akan sangat bervariasi tergantung pada platform deployment Anda (misalnya, SSH, Docker Registry, AWS, Heroku, dll.)
-    # Contoh untuk mendorong image ke Docker Registry setelah build dan tes berhasil:
-    # - name: Login ke Docker Hub
-    #   if: github.ref == 'refs/heads/main'
-    #   uses: docker/login-action@v3
-    #   with:
-    #     username: ${{ secrets.DOCKER_USERNAME }}
-    #     password: ${{ secrets.DOCKER_PASSWORD }}
-    # - name: Mendorong Image Aplikasi ke Docker Hub
-    #   if: github.ref == 'refs/heads/main'
-    #   run: |
-    #     docker-compose push app # Asumsi 'app' adalah nama layanan aplikasi Anda
+    # Catatan: Tidak ada langkah deployment langsung ke Vercel di sini.
+    # Vercel akan secara otomatis mendeteksi perubahan di branch 'main' Anda
+    # dan menjalankan proses build & deployment-nya sendiri setelah ini.
