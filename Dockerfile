@@ -30,7 +30,7 @@ RUN docker-php-ext-configure gd '--with-jpeg' '--with-freetype'
 RUN docker-php-ext-install intl opcache pdo_mysql zip gd
 RUN pecl install xdebug && docker-php-ext-enable xdebug
 RUN a2enmod rewrite
-
+COPY package.json package-lock.json ./
 # INSTALL APCU
 RUN pecl install apcu-5.1.24 && docker-php-ext-enable apcu
 RUN echo "apc.enable_cli=1" >> /usr/local/etc/php/php.ini
