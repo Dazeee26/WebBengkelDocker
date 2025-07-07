@@ -1,5 +1,5 @@
 # Nama alur kerja ini akan muncul di tab "Actions" di repositori GitHub Anda
-name: CI Laravel untuk Forge
+name: Frontend CI untuk Vercel
 
 # Menentukan kapan alur kerja ini akan dijalankan
 on:
@@ -11,70 +11,30 @@ on:
       - main # Jalankan alur kerja saat ada pull request ke branch 'main'
 
 jobs:
-  build-and-test:
+  build-frontend:
     # Menentukan runner lingkungan untuk job ini
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Kode
+    - name: Checkout Code
       uses: actions/checkout@v4 # Mengambil kode dari repositori
 
-    - name: Set up PHP
-      uses: shivammathur/setup-php@v2
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
       with:
-        php-version: '8.2' # Sesuaikan dengan versi PHP yang Anda gunakan di Forge
-        extensions: mbstring, pdo_mysql, dom, filter, gd, json, session, xml, zip # Ekstensi PHP yang dibutuhkan
-        ini-values: post_max_size=256M, upload_max_filesize=256M
-        coverage: none # Atau 'xdebug' jika Anda ingin mengumpulkan cakupan kode
+        node-version: '20' # Sesuaikan dengan versi Node.js yang Anda gunakan untuk frontend
 
-    - name: Salin .env.example ke .env
-      # Ini diperlukan agar Composer dan Artisan dapat berjalan.
-      # Pastikan .env.example Anda memiliki konfigurasi dasar yang cukup untuk CI.
-      run: cp .env.example .env
+    - name: Install Frontend Dependencies (NPM/Yarn)
+      # Asumsi package.json ada di root proyek atau di sub-direktori frontend
+      run: npm install # Atau 'yarn install' jika Anda menggunakan Yarn
 
-    - name: Buat Kunci Aplikasi Laravel
-      # Menghasilkan kunci aplikasi yang diperlukan oleh Laravel.
-      run: php artisan key:generate
+    - name: Run Frontend Build
+      # Perintah ini akan mengkompilasi aset frontend Anda (misalnya, dari resources/js jika itu bagian dari monorepo)
+      # Pastikan ini menghasilkan file statis ke direktori yang benar (misalnya, 'public' atau 'dist')
+      run: npm run build # Atau 'yarn build'
 
-    - name: Instal Dependensi Composer
-      # Menginstal semua dependensi PHP yang didefinisikan dalam composer.json
-      run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-    - name: Instal Dependensi NPM
-      # Menginstal dependensi JavaScript/Node.js (jika ada frontend).
-      run: npm install
-
-    - name: Jalankan Build Frontend (Vite/Mix)
-      # Menjalankan perintah build frontend Anda (misalnya, untuk mengkompilasi aset CSS/JS).
-      # Ini penting agar aset frontend siap saat Forge menarik kode.
-      run: npm run build
-
-    - name: Konfigurasi Database untuk Tes
-      # Untuk CI/CD, disarankan menggunakan SQLite in-memory untuk tes agar lebih cepat.
-      # Pastikan konfigurasi .env di dalam kontainer disetel untuk ini.
-      run: |
-        mkdir -p database
-        touch database/database.sqlite # Buat file SQLite untuk tes
-        # Konfigurasi Laravel untuk menggunakan SQLite untuk tes
-        echo "DB_CONNECTION=sqlite" >> .env
-        echo "DB_DATABASE=database/database.sqlite" >> .env
-
-    - name: Jalankan Migrasi Database
-      # Menerapkan migrasi database ke database SQLite yang baru dibuat.
-      run: php artisan migrate --force
-
-    - name: Jalankan Seeder (opsional, jika Anda memiliki data seeder untuk tes)
-      # Jalankan seeder untuk mengisi data awal yang diperlukan untuk tes.
-      run: php artisan db:seed --force
-
-    - name: Jalankan Tes PHPUnit
-      # Menjalankan semua tes PHPUnit yang ada di proyek Anda.
-      # Jika tes ini gagal, alur kerja akan berhenti dan deployment ke Forge tidak akan terjadi.
-      run: php artisan test
-
-    # Catatan Penting:
-    # Tidak ada langkah deployment langsung ke Forge di sini.
-    # Laravel Forge akan secara otomatis menarik kode terbaru dari GitHub
-    # dan menjalankan Deploy Script yang Anda definisikan di Forge
-    # setiap kali ada push ke branch 'main' (atau branch yang Anda pantau)
-    # setelah alur kerja CI ini berhasil.
+    # Catatan: Tidak ada langkah deployment langsung ke Vercel di sini.
+    # Vercel akan secara otomatis mendeteksi perubahan di branch 'main' Anda
+    # dan menjalankan proses build & deployment-nya sendiri setelah ini.
+    # Pastikan Anda telah menghubungkan repositori GitHub Anda ke Vercel
+    # dan mengkonfigurasi "Build Command" serta "Output Directory" dengan benar di pengaturan proyek Vercel Anda.
