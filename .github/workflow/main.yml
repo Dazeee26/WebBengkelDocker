@@ -1,105 +1,55 @@
-# This workflow's name will appear in the "Actions" tab of your GitHub repository
-name: CI/CD Laravel with Docker
+name: Deploy to Railway
 
-# Defines when this workflow will run
 on:
   push:
     branches:
-      - main # Run the workflow on pushes to the 'main' branch
+      - main # Trigger deployment when changes are pushed to the 'main' branch
   pull_request:
     branches:
-      - main # Run the workflow on pull requests to the 'main' branch
+      - main
+    types: [opened, synchronize, reopened]
 
 jobs:
-  build-and-test-with-docker:
-    # Specifies the runner environment for this job
+  build_and_deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4 # Fetches the code from the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Build Docker Images
-      # This command will build all images defined in your docker-compose.yml
-      # Ensure your Dockerfile is configured for PHP 8.2 and Apache/Nginx.
-      run: docker-compose build
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3' # Sesuaikan dengan versi PHP kamu
+          extensions: gd, mysqli, pdo_mysql, pdo_pgsql, bcmath, exif, iconv, intl, zip, opcache # Tambahkan ekstensi yang dibutuhkan
+          tools: composer
 
-    - name: Start Docker Compose Services
-      # Starts services in the background
-      run: docker-compose up -d
+      - name: Install Composer dependencies
+        run: composer install --no-dev --optimize-autoloader
 
-    - name: Wait for Database Service to be Ready (Optional, but recommended if using external DB)
-      # If you're using a database like MySQL/PostgreSQL in your docker-compose.yml,
-      # you might need to wait for the database to be ready before running migrations.
-      # For in-memory SQLite, this step is less critical.
-      run: sleep 10 # Give 10 seconds for containers to start up
+      - name: Setup Node.js (if you have frontend assets)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Sesuaikan dengan versi Node.js kamu
 
-    - name: Copy .env.example to .env inside the container
-      # We will copy .env.example into the 'app' container.
-      # This is important for Laravel to have the correct configuration inside the container.
-      run: docker-compose exec app cp .env.example .env
+      - name: Install NPM dependencies and build assets
+        run: |
+          npm install
+          npm run build # Atau 'npm run prod' atau 'yarn build' sesuai package.json kamu
 
-    - name: Generate Laravel Application Key inside the container
-      run: docker-compose exec app php artisan key:generate
+      # Opsional: Jalankan tes Laravel (misalnya PHPUnit)
+      - name: Run Laravel Tests
+        run: php artisan test
 
-    - name: Install Composer Dependencies inside the container
-      # Runs composer install inside the 'app' container
-      run: docker-compose exec app composer install --no-interaction --prefer-dist --optimize-autoloader
+      - name: Install Railway CLI
+        run: npm install -g @railwaydev/cli
 
-    - name: Install NPM Dependencies inside the container
-      # Runs npm install inside the 'app' container
-      # Assumes Node.js is available inside the 'app' container (via your Dockerfile)
-      run: docker-compose exec app npm install
-
-    - name: Run Frontend Build (Vite) inside the container
-      # Runs npm run build inside the 'app' container
-      run: docker-compose exec app npm run build
-
-    - name: Configure Database for Tests inside the container
-      # For CI/CD, it's common to use in-memory SQLite or a file for tests.
-      # Ensure the .env configuration inside the container is set for this.
-      # We'll set environment variables directly for the migration and test commands.
-      run: |
-        docker-compose exec app php artisan config:clear
-        docker-compose exec app php artisan cache:clear
-        docker-compose exec app php artisan view:clear
-
-    - name: Run Database Migrations inside the container
-      # Runs migrations inside the 'app' container
-      # We use DB_CONNECTION=sqlite and DB_DATABASE=:memory: for fast tests
-      run: docker-compose exec -e DB_CONNECTION=sqlite -e DB_DATABASE=:memory: app php artisan migrate --force
-
-    - name: Run Seeders (optional) inside the container
-      # If you have seeder data required for tests, you can run it here.
-      run: docker-compose exec -e DB_CONNECTION=sqlite -e DB_DATABASE=:memory: app php artisan db:seed --force
-
-    - name: Run PHPUnit Tests inside the container
-      # Runs PHPUnit tests inside the 'app' container
-      run: docker-compose exec -e DB_CONNECTION=sqlite -e DB_DATABASE=:memory: app php artisan test
-
-    - name: Stop Docker Compose Services
-      # Ensures that Docker containers are stopped and cleaned up after tests are complete
-      if: always() # Always run this step, even if previous steps failed
-      run: docker-compose down --volumes --remove-orphans
-
-  # --- Optional: Deployment Section ---
-  # If you want to automate deployment, you can add steps here.
-  # This will vary greatly depending on your deployment platform (e.g., SSH, Docker Registry, AWS, Heroku, etc.)
-  # Example for pushing an image to a Docker Registry after successful build and tests:
-  # deploy:
-  #   needs: build-and-test-with-docker
-  #   if: github.ref == 'refs/heads/main' # Only deploy if pushed to the main branch
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout Code
-  #       uses: actions/checkout@v4
-  #     - name: Login to Docker Hub
-  #       uses: docker/login-action@v3
-  #       with:
-  #         username: ${{ secrets.DOCKER_HUB_USERNAME }}
-  #         password: ${{ secrets.DOCKER_HUB_TOKEN }}
-  #     - name: Build and Push Docker Image
-  #       run: |
-  #         docker-compose build app # Build only the 'app' service image
-  #         docker tag your-app-name_app your-dockerhub-username/your-app-name:latest
-  #         docker push your-dockerhub-username/your-app-name:latest
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }} # Dapatkan ini dari Railway CLI atau dashboard
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }} # Dapatkan dari URL Railway project kamu
+          RAILWAY_ENVIRONMENT: production # Atau staging, sesuai environment di Railway
+        run: |
+          # Perintah ini akan memicu Railway untuk mengambil kode terbaru dari GitHub
+          # dan menjalankan proses deployment sesuai konfigurasi di Railway (yang akan membaca docker-compose.yml)
+          railway up --detach # Gunakan --detach untuk tidak memblokir workflow
