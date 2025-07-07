@@ -1,0 +1,64 @@
+# docker-compose.yml
+version: "3.8" # Gunakan versi Compose terbaru yang kompatibel
+
+services:
+  # Layanan PHP dan Apache untuk aplikasi Laravel Anda
+  php-apache:
+    container_name: "nama-proyek-bengkel-app" # Nama container yang mudah dikenali
+    build:
+      context: . # Konteks build adalah direktori saat ini (tempat docker-compose.yml berada)
+      dockerfile: Dockerfile # Gunakan Dockerfile yang telah kita buat
+    # Volume untuk menautkan kode aplikasi dari host ke dalam container.
+    # Ini memungkinkan perubahan kode langsung terlihat tanpa membangun ulang image.
+    volumes:
+      - .:/var/www/html # Mount seluruh direktori proyek Anda ke /var/www/html di dalam container
+    ports:
+      - "80:80" # Map port 80 dari host ke port 80 di container Apache
+    # Variabel lingkungan untuk aplikasi Laravel Anda
+    environment:
+      # Pastikan variabel ini cocok dengan konfigurasi database di .env lokal Anda
+      DB_CONNECTION: mysql
+      DB_HOST: db # Nama host 'db' sesuai dengan nama service database di docker-compose
+      DB_PORT: 3306
+      DB_DATABASE: uas_db
+      DB_USERNAME: uas_user
+      DB_PASSWORD: 2332 # Ganti dengan password yang aman untuk pengembangan lokal!
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost # URL aplikasi Anda di lingkungan lokal
+      # APP_KEY akan diatur saat 'php artisan key:generate' dijalankan (lihat bagian CI/CD)
+    # Pastikan layanan 'db' dimulai sebelum 'php-apache'
+    depends_on:
+      - db
+
+  # Layanan database MySQL
+  db:
+    container_name: "nama-proyek-bengkel-mysql" # Nama container yang mudah dikenali
+    image: mysql:8.2 # Gunakan image MySQL versi 8.2
+    restart: always # Selalu restart container jika berhenti
+    # Variabel lingkungan untuk konfigurasi MySQL
+    environment:
+      MYSQL_ROOT_PASSWORD: 2332 # Ganti dengan password root yang kuat dan aman!
+      MYSQL_DATABASE: uas_db
+      MYSQL_USER: uas_user
+      MYSQL_PASSWORD: 2332 # Ganti dengan password user yang kuat dan aman!
+    # Volume untuk menyimpan data database secara persisten
+    # Data akan tetap ada meskipun container 'db' dihapus dan dibuat ulang
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306" # Map port 3306 dari host ke port 3306 di container MySQL (untuk akses dari host jika diperlukan)
+
+  # Layanan Adminer (opsional, untuk manajemen database berbasis web)
+  adminer:
+    container_name: "nama-proyek-bengkel-adminer" # Nama container yang mudah dikenali
+    image: adminer # Gunakan image Adminer
+    ports:
+      - "8080:8080" # Map port 8080 dari host ke port 8080 di container Adminer
+    # Adminer membutuhkan layanan 'db' untuk terhubung
+    depends_on:
+      - db
+
+# Definisi volume bernama untuk data database persisten
+volumes:
+  db_data:
